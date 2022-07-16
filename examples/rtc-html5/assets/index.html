@@ -22,7 +22,7 @@
             dataChannel.onmessage = (e) => { console.log('Got message:', e.data); };
             peerConn.createOffer({})
                 .then((desc) => peerConn.setLocalDescription(desc))
-                .then(() => { })
+                .then(_ => { })
                 .catch((err) => console.error(err));
             peerConn.onicecandidate = (e) => {
                 if (e.candidate == null) {
