@@ -2,7 +2,6 @@ package ws
 
 import (
 	"fmt"
-	"log"
 
 	"github.com/gorilla/websocket"
 
@@ -29,13 +28,12 @@ func (cli Client) Read(v any) error { return cli.rwc.ReadJSON(v) }
 
 func (cli Client) Write(v any) error { return cli.rwc.WriteJSON(v) }
 
-func (cli Client) Serve() error {
-	defer cli.Close()
+func (cli *Client) Serve() error {
 
 	for {
 		var msg chat.Message
 		if err := cli.Read(&msg); err != nil {
-			log.Println(err)
+			cli.p.unr <- cli
 			return err
 		}
 
@@ -45,3 +43,5 @@ func (cli Client) Serve() error {
 		fmt.Printf("Message Received: %+v\n", msg)
 	}
 }
+
+// TODO -- if error, close connection

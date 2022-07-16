@@ -2,6 +2,7 @@ package ws
 
 import (
 	"fmt"
+	"log"
 	"sync"
 
 	chat "ws-chat.example"
@@ -40,11 +41,16 @@ func (p *Pool) add(cli *Client) {
 
 	p.clis[cli] = true
 	fmt.Println("Size of Connection Pool: ", len(p.clis))
+	go cli.Serve()
 }
 
 func (p *Pool) remove(cli *Client) {
 	p.mu.Lock()
-	defer p.mu.Unlock()
+	defer func() {
+		p.mu.Unlock()
+		log.Println("closing")
+		cli.Close()
+	}()
 
 	delete(p.clis, cli)
 }
@@ -53,11 +59,9 @@ func (p *Pool) run() {
 	for {
 		select {
 		case cli := <-p.r:
-			// serve client
 			p.add(cli)
 			p.broadcast("New User Joined...")
 		case cli := <-p.unr:
-			// close client
 			p.remove(cli)
 			p.broadcast("User Disconnected...")
 		case msg := <-p.bc:
