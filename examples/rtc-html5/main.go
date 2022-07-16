@@ -1,12 +1,11 @@
-// source - https://github.com/pion/webrtc/blob/master/examples/ice-tcp/main.go
+//go:build !js
+// +build !js
 
 package main
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
-	"io"
 	"net"
 	"net/http"
 	"time"
@@ -16,6 +15,7 @@ import (
 
 var api *webrtc.API //nolint
 
+// Everything below is the Pion WebRTC API! Thanks for using it ❤️.
 func doSignaling(w http.ResponseWriter, r *http.Request) {
 	peerConnection, err := api.NewPeerConnection(webrtc.Configuration{})
 	if err != nil {
@@ -33,9 +33,6 @@ func doSignaling(w http.ResponseWriter, r *http.Request) {
 		d.OnOpen(func() {
 			for range time.Tick(time.Second * 3) {
 				if err = d.SendText(time.Now().String()); err != nil {
-					if errors.Is(io.ErrClosedPipe, err) {
-						return
-					}
 					panic(err)
 				}
 			}
@@ -78,15 +75,8 @@ func doSignaling(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	settingEngine := webrtc.SettingEngine{}
-
-	// Enable support only for TCP ICE candidates.
-	settingEngine.SetNetworkTypes([]webrtc.NetworkType{
-		webrtc.NetworkTypeTCP4,
-		webrtc.NetworkTypeTCP6,
-	})
-
-	tcpListener, err := net.ListenTCP("tcp", &net.TCPAddr{
+	// Listen on UDP Port 8443, will be used for all WebRTC traffic
+	udpListener, err := net.ListenUDP("udp", &net.UDPAddr{
 		IP:   net.IP{0, 0, 0, 0},
 		Port: 8443,
 	})
@@ -94,11 +84,17 @@ func main() {
 		panic(err)
 	}
 
-	fmt.Printf("Listening for ICE TCP at %s\n", tcpListener.Addr())
+	fmt.Printf("Listening for WebRTC traffic at %s\n", udpListener.LocalAddr())
 
-	tcpMux := webrtc.NewICETCPMux(nil, tcpListener, 8)
-	settingEngine.SetICETCPMux(tcpMux)
+	// Create a SettingEngine, this allows non-standard WebRTC behavior
+	settingEngine := webrtc.SettingEngine{}
 
+	// Configure our SettingEngine to use our UDPMux. By default a PeerConnection has
+	// no global state. The API+SettingEngine allows the user to share state between them.
+	// In this case we are sharing our listening port across many.
+	settingEngine.SetICEUDPMux(webrtc.NewICEUDPMux(nil, udpListener))
+
+	// Create a new API using our SettingEngine
 	api = webrtc.NewAPI(webrtc.WithSettingEngine(settingEngine))
 
 	http.Handle("/", http.FileServer(http.Dir(".")))
